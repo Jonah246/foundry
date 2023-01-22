@@ -179,6 +179,8 @@ ethers::contract::abigen!(
             writeJson(string, string, string)
             pauseGasMetering()
             resumeGasMetering()
+            hookCall(address, bytes calldata, bytes calldata)
+            clearHookedCalls()
     ]"#,
 );
 pub use hevm::{HEVMCalls, HEVM_ABI};

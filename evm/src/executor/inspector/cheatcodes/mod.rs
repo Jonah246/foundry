@@ -40,6 +40,11 @@ pub use env::{Log, Prank, RecordAccess};
 /// Assertion helpers (such as `expectEmit`)
 mod expect;
 pub use expect::{ExpectedCallData, ExpectedEmit, ExpectedRevert, MockCallDataContext};
+/// Cheatcodes that interact with the hook;
+mod hook;
+pub use hook::{
+    HookCallDataContext, HookCallBackData,
+    HookCallExecutionContext};
 
 /// Cheatcodes that interact with the external environment (FFI etc.)
 mod ext;
@@ -114,6 +119,11 @@ pub struct Cheatcodes {
 
     /// Mocked calls
     pub mocked_calls: BTreeMap<Address, BTreeMap<MockCallDataContext, Bytes>>,
+
+    /// Mocked calls
+    pub hooked_calls: BTreeMap<Address, BTreeMap<HookCallDataContext, HookCallBackData>>,
+
+    pub hooked_call_context: Vec<HookCallExecutionContext>,
 
     /// Expected calls
     pub expected_calls: BTreeMap<Address, Vec<ExpectedCallData>>,
@@ -191,6 +201,7 @@ impl Cheatcodes {
             .or_else(|| ext::apply(self, self.config.ffi, &decoded))
             .or_else(|| snapshot::apply(self, data, &decoded))
             .or_else(|| fork::apply(self, data, &decoded))
+            .or_else(|| hook::apply(self, data, &decoded))
             .ok_or_else(|| "Cheatcode was unhandled. This is a bug.".to_string().encode())?
     }
 
@@ -386,6 +397,32 @@ where
                         mock.value.map(|value| value == call.transfer.value).unwrap_or(true)
                 }) {
                     return (Return::Return, Gas::new(call.gas_limit), mock_retdata.clone())
+                }
+            }
+
+            // Handle hooked calls
+            if let Some(hooks) = self.hooked_calls.get_mut(&call.contract) {
+                if let Some((hook, callback)) = hooks.iter().find(|(hook, _)| {
+                    hook.calldata.len() <= call.input.len() &&
+                        *hook.calldata == call.input[..hook.calldata.len()]
+                }) {
+                    self.hooked_call_context.push(HookCallExecutionContext {
+                        caller: data.env.tx.caller,
+                        input: call.input.clone(),
+                    });
+                    print!("Hooked call to {} with input: ", callback.calldata.clone().encode_hex());
+                    // The callback function should be implemented as:
+                    // function callback(address target, bytes calldata input) ...
+                    call.input = Bytes::from([
+                        callback.calldata.clone().to_vec(), // selector
+                        call.contract.encode(),             // address
+                        call.input.clone().encode(),
+                    ].concat());
+                    call.contract = callback.address;
+                    // todo: better format of input?
+
+
+                    return (Return::Continue, Gas::new(call.gas_limit), Bytes::new());
                 }
             }
 

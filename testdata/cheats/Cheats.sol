@@ -176,6 +176,19 @@ interface Cheats {
 
     function expectEmit(bool, bool, bool, bool, address) external;
 
+    // Hooks a call to an address, replacing the call with a callback call to the hook contract.
+    // Calldata can either be strict or a partial match, e.g. if you only
+    // pass a Solidity selector to the expected calldata, then the entire Solidity
+    // function will be hooked.
+    function hookCall(address, bytes calldata, bytes calldata) external;
+
+
+    // Execute the hook function.
+    // Returns the calldata and success of the hook function.
+    // Hooked function will execute.
+    function executeHook(bytes calldata input) external returns(bytes calldata, bool success);
+
+
     // Mocks a call to an address, returning specified data.
     // Calldata can either be strict or a partial match, e.g. if you only
     // pass a Solidity selector to the expected calldata, then the entire Solidity
