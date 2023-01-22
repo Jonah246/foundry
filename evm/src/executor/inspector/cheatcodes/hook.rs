@@ -6,7 +6,7 @@ use crate::{
 };
 use bytes::Bytes;
 
-use revm::{EVMData, CallInputs, Gas};
+use revm::{EVMData};
 use std::cmp::Ordering;
 use ethers::{
         types::{Address, U256},
@@ -70,6 +70,7 @@ impl PartialOrd for HookCallDataContext {
 pub fn apply<DB: DatabaseExt>(
     state: &mut Cheatcodes,
     data: &mut EVMData<'_, DB>,
+    caller: Address,
     call: &HEVMCalls,
 ) -> Option<Result<Bytes, Bytes>> {
     Some(match call {
@@ -80,7 +81,7 @@ pub fn apply<DB: DatabaseExt>(
                     value: None
                 },
                 HookCallBackData {
-                    address: data.env.tx.caller,
+                    address: caller,
                     calldata: inner.2.to_vec().into(),
                 }
             );

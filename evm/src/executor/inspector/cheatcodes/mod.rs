@@ -201,7 +201,7 @@ impl Cheatcodes {
             .or_else(|| ext::apply(self, self.config.ffi, &decoded))
             .or_else(|| snapshot::apply(self, data, &decoded))
             .or_else(|| fork::apply(self, data, &decoded))
-            .or_else(|| hook::apply(self, data, &decoded))
+            .or_else(|| hook::apply(self, data, caller, &decoded))
             .ok_or_else(|| "Cheatcode was unhandled. This is a bug.".to_string().encode())?
     }
 
@@ -402,27 +402,20 @@ where
 
             // Handle hooked calls
             if let Some(hooks) = self.hooked_calls.get_mut(&call.contract) {
-                if let Some((hook, callback)) = hooks.iter().find(|(hook, _)| {
+                if let Some((_, callback)) = hooks.iter().find(|(hook, _)| {
                     hook.calldata.len() <= call.input.len() &&
                         *hook.calldata == call.input[..hook.calldata.len()]
                 }) {
-                    self.hooked_call_context.push(HookCallExecutionContext {
-                        caller: data.env.tx.caller,
-                        input: call.input.clone(),
-                    });
-                    print!("Hooked call to {} with input: ", callback.calldata.clone().encode_hex());
                     // The callback function should be implemented as:
                     // function callback(address target, bytes calldata input) ...
-                    call.input = Bytes::from([
-                        callback.calldata.clone().to_vec(), // selector
-                        call.contract.encode(),             // address
-                        call.input.clone().encode(),
-                    ].concat());
+                    let params = call.contract.encode().into_iter().chain(
+                            call.input.clone().encode().into_iter());
+                    call.input = callback.calldata.clone().to_vec().into_iter().chain(
+                        params).collect();
+
                     call.contract = callback.address;
                     // todo: better format of input?
-
-
-                    return (Return::Continue, Gas::new(call.gas_limit), Bytes::new());
+                    // return (Return::Continue, Gas::new(call.gas_limit), Bytes::new());
                 }
             }
 

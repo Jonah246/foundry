@@ -180,7 +180,7 @@ interface Cheats {
     // Calldata can either be strict or a partial match, e.g. if you only
     // pass a Solidity selector to the expected calldata, then the entire Solidity
     // function will be hooked.
-    function hookCall(address, bytes calldata, bytes calldata) external;
+    function hookCall(address, bytes calldata, bytes4) external;
 
 
     // Execute the hook function.

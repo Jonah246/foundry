@@ -179,7 +179,7 @@ ethers::contract::abigen!(
             writeJson(string, string, string)
             pauseGasMetering()
             resumeGasMetering()
-            hookCall(address, bytes calldata, bytes calldata)
+            hookCall(address,bytes calldata,bytes4)
             clearHookedCalls()
     ]"#,
 );
