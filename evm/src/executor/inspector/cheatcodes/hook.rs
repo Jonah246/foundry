@@ -6,9 +6,9 @@ use crate::{
 };
 use bytes::Bytes;
 
-use revm::{EVMData};
 use std::cmp::Ordering;
 use ethers::{
+        abi::AbiEncode,
         types::{Address, U256},
     };
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -27,7 +27,6 @@ pub struct HookCallBackData {
 #[derive(Clone, Debug, Default)]
 pub struct HookCallExecutionContext {
     pub caller: Address,
-    pub input: Bytes,
 }
 
 impl Ord for HookCallDataContext {
@@ -47,29 +46,8 @@ impl PartialOrd for HookCallDataContext {
     }
 }
 
-// pub fn handle_hooked_call<DB: DatabaseExt>(
-//     state: &mut Cheatcodes,
-//         data: &mut EVMData<'_, DB>,
-//         call: &mut CallInputs,
-//         is_static: bool,
-//         call_back_data: &HookCallBackData,
-// ) -> (Return, Gas, Bytes) {
-//     state.hooked_call_context.push(HookCallExecutionContext {
-//         caller: data.env.tx.caller,
-//         input: call.input.clone(),
-//     });
-//     call.contract = call_back_data.address;
-//     // todo: better format of input?
-//     call.input = Bytes::from([
-//         call.input.clone().to_vec(),
-//         call_back_data.calldata.clone().encode(),
-//         ].concat());
-//     return (Return::Continue, Gas::new(call.gas_limit), Bytes::new());
-// }
-
 pub fn apply<DB: DatabaseExt>(
     state: &mut Cheatcodes,
-    data: &mut EVMData<'_, DB>,
     caller: Address,
     call: &HEVMCalls,
 ) -> Option<Result<Bytes, Bytes>> {
@@ -91,6 +69,16 @@ pub fn apply<DB: DatabaseExt>(
             state.hooked_calls = Default::default();
             Ok(Bytes::new())
         },
+        HEVMCalls::ExecuteHookedCall(_) => {
+            let execute_hook = HookCallExecutionContext {
+                caller: caller.clone(),
+            };
+            if state.execute_hook.is_some() {
+                return Some(Err("You can't execute a hook twice.".encode().into()));
+            }
+            state.execute_hook = Some(execute_hook);
+            Ok(Bytes::new())
+        }
        _ => return None,
     })
 }

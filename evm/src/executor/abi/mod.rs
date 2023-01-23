@@ -181,6 +181,7 @@ ethers::contract::abigen!(
             resumeGasMetering()
             hookCall(address,bytes calldata,bytes4)
             clearHookedCalls()
+            executeHookedCall()
     ]"#,
 );
 pub use hevm::{HEVMCalls, HEVM_ABI};

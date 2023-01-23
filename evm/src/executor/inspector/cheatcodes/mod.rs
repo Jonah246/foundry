@@ -13,7 +13,7 @@ use crate::{
 };
 use bytes::Bytes;
 use ethers::{
-    abi::{AbiDecode, AbiEncode, RawLog},
+    abi::{AbiDecode, AbiEncode, RawLog, Token, encode},
     signers::LocalWallet,
     types::{
         transaction::eip2718::TypedTransaction, Address, NameOrAddress, TransactionRequest, H256,
@@ -123,6 +123,8 @@ pub struct Cheatcodes {
     /// Mocked calls
     pub hooked_calls: BTreeMap<Address, BTreeMap<HookCallDataContext, HookCallBackData>>,
 
+    pub execute_hook: Option<HookCallExecutionContext>,
+
     pub hooked_call_context: Vec<HookCallExecutionContext>,
 
     /// Expected calls
@@ -201,7 +203,7 @@ impl Cheatcodes {
             .or_else(|| ext::apply(self, self.config.ffi, &decoded))
             .or_else(|| snapshot::apply(self, data, &decoded))
             .or_else(|| fork::apply(self, data, &decoded))
-            .or_else(|| hook::apply(self, data, caller, &decoded))
+            .or_else(|| hook::apply::<DB>(self, caller, &decoded))
             .ok_or_else(|| "Cheatcode was unhandled. This is a bug.".to_string().encode())?
     }
 
@@ -401,21 +403,19 @@ where
             }
 
             // Handle hooked calls
-            if let Some(hooks) = self.hooked_calls.get_mut(&call.contract) {
-                if let Some((_, callback)) = hooks.iter().find(|(hook, _)| {
-                    hook.calldata.len() <= call.input.len() &&
-                        *hook.calldata == call.input[..hook.calldata.len()]
-                }) {
-                    // The callback function should be implemented as:
-                    // function callback(address target, bytes calldata input) ...
-                    let params = call.contract.encode().into_iter().chain(
-                            call.input.clone().encode().into_iter());
-                    call.input = callback.calldata.clone().to_vec().into_iter().chain(
-                        params).collect();
-
-                    call.contract = callback.address;
-                    // todo: better format of input?
-                    // return (Return::Continue, Gas::new(call.gas_limit), Bytes::new());
+            if self.execute_hook.is_none(){
+                if let Some(hooks) = self.hooked_calls.get_mut(&call.contract) {
+                    if let Some((_, callback)) = hooks.iter().find(|(hook, _)| {
+                        hook.calldata.len() <= call.input.len() &&
+                            *hook.calldata == call.input[..hook.calldata.len()]
+                    }) {
+                        let params = [
+                            Token::Address(call.contract.clone()),
+                            Token::Bytes(call.input.clone().to_vec())];
+                        call.input = callback.calldata.clone().to_vec().into_iter().chain(
+                            encode(&params).into_iter()).collect();
+                        call.contract = callback.address;
+                    }
                 }
             }
 
@@ -531,6 +531,12 @@ where
                 std::mem::take(&mut self.broadcast);
             }
         }
+
+        // Clean up execute hook
+        if let Some(_) = &self.execute_hook {
+            std::mem::take(&mut self.execute_hook);
+        }
+
 
         // Handle expected reverts
         if let Some(expected_revert) = &self.expected_revert {

@@ -186,7 +186,7 @@ interface Cheats {
     // Execute the hook function.
     // Returns the calldata and success of the hook function.
     // Hooked function will execute.
-    function executeHook(bytes calldata input) external returns(bytes calldata, bool success);
+    function executeHookedCall() external;
 
 
     // Mocks a call to an address, returning specified data.

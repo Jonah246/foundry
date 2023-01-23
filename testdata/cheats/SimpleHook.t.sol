@@ -1550,10 +1550,12 @@ contract SimpleHookTest is DSTest {
 
     function hook(address target, bytes calldata input) public returns(uint256) {
         // cheats.prank(msg.sender);
-        // (bool success, bytes memory value) = target.call(input);
+        cheats.executeHookedCall();
+        console.logBytes(input);
+        console.log("target:", target);
+        (bool success, bytes memory value) = target.call(input);
         // require(success, "hook call failed");
-        // return abi.decode(value, (uint256)) + 250;
-        return 42 + 250;
+        return abi.decode(value, (uint256)) + 250;
     }
 
     /// Tests that simple hook that does not touch storage would works
